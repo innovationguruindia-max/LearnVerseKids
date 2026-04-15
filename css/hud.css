@@ -1,0 +1,190 @@
+/* ============================================
+   LearnVerseKids — HUD (Heads-Up Display) Styles
+   ============================================ */
+
+#hud {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+
+/* Top bar */
+.hud-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+}
+
+.hud-back {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  cursor: pointer;
+  transition: var(--transition-bounce);
+}
+
+.hud-back:hover {
+  transform: scale(1.15);
+  background: rgba(255,255,255,0.2);
+}
+
+.hud-module-name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--accent-3), var(--accent-4));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hud-stars {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 30px;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.star-icon {
+  font-size: 22px;
+  animation: starSpin 3s linear infinite;
+}
+
+@keyframes starSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.star-count {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--star-color);
+}
+
+/* Center area — collapsed, prompt is now fixed-position */
+.hud-center {
+  display: none;
+}
+
+.hud-prompt {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  z-index: 100;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  padding: 10px 32px;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,255,255,0.2);
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  max-width: 85%;
+  white-space: nowrap;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  pointer-events: none;
+}
+
+.hud-prompt.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Bottom */
+.hud-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud-progress {
+  width: 60%;
+  max-width: 400px;
+  height: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hud-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-4), var(--accent-3));
+  border-radius: 4px;
+  transition: width var(--transition-medium);
+}
+
+.hud-hand-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: var(--transition-medium);
+}
+
+.hud-hand-indicator.detected {
+  border-color: var(--success-color);
+  color: var(--success-color);
+}
+
+.hud-hand-indicator span:first-child {
+  font-size: 20px;
+}
+
+/* ============================================
+   HUD Animations
+   ============================================ */
+.hud-star-pop {
+  animation: starPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes starPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.8); }
+  100% { transform: scale(1); }
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 600px) {
+  #hud { padding: 10px 12px; }
+  .hud-back { width: 42px; height: 42px; font-size: 22px; }
+  .hud-module-name { font-size: 17px; }
+  .hud-prompt { font-size: 20px; padding: 10px 18px; }
+  .hud-stars { padding: 6px 12px; }
+  .star-count { font-size: 17px; }
+  .hud-progress { width: 80%; }
+}

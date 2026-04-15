@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>LearnVerseKids — 3D Gesture Learning for Kids</title>
+  <meta name="description" content="An immersive 3D gesture-based learning playground for children under 5. Learn alphabets, numbers, animals, fruits and more using hand gestures!">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🌟</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/scenes.css">
+  <link rel="stylesheet" href="css/hud.css">
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loader-content">
+      <div class="loader-icon">🌈</div>
+      <h1 class="loader-title">LearnVerseKids</h1>
+      <p class="loader-subtitle">Getting your adventure ready...</p>
+      <div class="loader-bar-container">
+        <div class="loader-bar" id="loader-bar"></div>
+      </div>
+      <p class="loader-status" id="loader-status">Loading 3D world...</p>
+    </div>
+  </div>
+
+  <!-- Camera Permission Screen -->
+  <div id="camera-permission-screen" class="hidden">
+    <div class="permission-content">
+      <div class="permission-icon">📸</div>
+      <h1>Let's Use Your Camera!</h1>
+      <p>Wave your hands to play and learn!</p>
+      <button id="enable-camera-btn" class="big-button">
+        <span class="btn-icon">👋</span>
+        <span>Start Camera</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Welcome / Module Selection Screen -->
+  <div id="welcome-screen" class="hidden">
+    <div class="welcome-header">
+      <h1 class="welcome-title">
+        <span class="title-emoji">🌟</span>
+        LearnVerseKids
+        <span class="title-emoji">🌟</span>
+      </h1>
+      <p class="welcome-subtitle">Touch to pick a lesson!</p>
+    </div>
+    <div class="module-grid" id="module-grid">
+      <!-- Modules rendered by JS -->
+    </div>
+    <div class="welcome-footer">
+      <div class="theme-selector" id="theme-selector">
+        <!-- Theme buttons rendered by JS -->
+      </div>
+    </div>
+    <!-- Parent Control Trigger (hidden corner) -->
+    <div id="parent-control-trigger" class="parent-trigger"></div>
+  </div>
+
+  <!-- Main 3D Canvas + HUD -->
+  <div id="game-container" class="hidden">
+    <canvas id="three-canvas"></canvas>
+    <video id="camera-feed" autoplay playsinline></video>
+
+    <!-- HUD Overlay -->
+    <div id="hud">
+      <div class="hud-top">
+        <div class="hud-back" id="hud-back">
+          <span>🏠</span>
+        </div>
+        <div class="hud-module-name" id="hud-module-name">Alphabets</div>
+        <div class="hud-stars" id="hud-stars">
+          <span class="star-icon">⭐</span>
+          <span class="star-count" id="star-count">0</span>
+        </div>
+      </div>
+      <div class="hud-center">
+        <div class="hud-prompt" id="hud-prompt"></div>
+      </div>
+      <div class="hud-bottom">
+        <div class="hud-progress" id="hud-progress">
+          <div class="hud-progress-bar" id="hud-progress-bar"></div>
+        </div>
+        <div class="hud-hand-indicator" id="hud-hand-indicator">
+          <span>✋</span>
+          <span class="hand-status" id="hand-status">Looking for hand...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reward Overlay -->
+    <div id="reward-overlay" class="hidden">
+      <div class="reward-content" id="reward-content"></div>
+    </div>
+
+    <!-- Finger Cursor -->
+    <div id="finger-cursor" class="hidden">
+      <div class="cursor-ring"></div>
+      <div class="cursor-dot"></div>
+    </div>
+  </div>
+
+  <!-- Parent Control Panel -->
+  <div id="parent-panel" class="hidden">
+    <div class="parent-panel-content">
+      <h2>👨‍👩‍👧 Parent Controls</h2>
+      <div class="parent-setting">
+        <label>Difficulty</label>
+        <select id="difficulty-select">
+          <option value="slow">Slow Mode (Bigger, Slower)</option>
+          <option value="normal" selected>Normal Mode</option>
+        </select>
+      </div>
+      <div class="parent-setting">
+        <label>Sound Effects</label>
+        <input type="checkbox" id="sound-toggle" checked>
+      </div>
+      <div class="parent-setting">
+        <label>Background Music</label>
+        <input type="checkbox" id="music-toggle" checked>
+      </div>
+      <div class="parent-setting">
+        <label>Theme</label>
+        <select id="theme-select">
+          <option value="rainbow">🌈 Rainbow</option>
+          <option value="space">🚀 Space</option>
+          <option value="ocean">🌊 Ocean</option>
+          <option value="forest">🌲 Forest</option>
+        </select>
+      </div>
+      <button id="parent-close-btn" class="parent-close">Close</button>
+    </div>
+  </div>
+
+  <!-- Scripts (ES Modules) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
