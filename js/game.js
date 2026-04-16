@@ -1,7 +1,9 @@
 /* ============================================
    LearnVerseKids — Game Logic Engine
    Manages learning loops, spawning, progression,
-   scoring, and reward systems
+   scoring, and reward systems.
+   Optimised with shorter cooldowns for
+   responsive interaction.
    ============================================ */
 
 import {
@@ -25,9 +27,9 @@ export class GameEngine {
     this.isTransitioning = false;
     this.difficulty = 'normal';
 
-    // Collision cooldown
+    // Collision cooldown — reduced for responsiveness
     this._lastHitTime = 0;
-    this._hitCooldown = 1200; // ms
+    this._hitCooldown = 800; // ms
 
     // Callbacks
     this.onStarChange = null;
@@ -112,7 +114,6 @@ export class GameEngine {
 
   spawnNext() {
     if (!this.isActive || this.currentIndex >= this.currentData.length) {
-      // Module complete!
       this._completeModule();
       return;
     }
@@ -225,7 +226,6 @@ export class GameEngine {
   }
 
   _showAlphabetAssociation(item) {
-    // Show the word object (e.g., Apple for A)
     const settings = DIFFICULTY[this.difficulty];
     this.scene.createEmojiObject(item.emoji, item.word, item.color, settings.objectScale);
 
@@ -263,7 +263,6 @@ export class GameEngine {
   // ============================================
 
   handleMiss() {
-    // Highlight the object to guide the child
     this.scene.highlightObject(true);
     this.audio.playMiss();
   }

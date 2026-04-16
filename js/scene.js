@@ -1,7 +1,8 @@
 /* ============================================
-   LearnVerseKids — 3D Scene Engine
-   Three.js scene setup, object creation,
-   particle effects, and animations
+   LearnVerseKids — 3D Scene Engine (AR Mode)
+   Three.js scene with transparent background
+   for AR camera passthrough. Objects spawn at
+   random positions. Optimised for performance.
    ============================================ */
 
 import * as THREE from 'three';
@@ -23,7 +24,6 @@ export class SceneEngine {
 
     // Particles
     this.particles = [];
-    this.bgParticles = null;
 
     // Animation mixins
     this._animCallbacks = [];
@@ -36,118 +36,67 @@ export class SceneEngine {
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    // Scene
+    // Scene — no background (transparent for AR camera)
     this.scene = new THREE.Scene();
 
     // Camera
     this.camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 100);
     this.camera.position.set(0, 0, 8);
 
-    // Renderer
+    // Renderer — transparent background so camera feed shows through
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: true,
+      antialias: false, // disabled for performance
       alpha: true
     });
     this.renderer.setSize(w, h);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setClearColor(0x000000, 0); // fully transparent
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     // Lighting
     this._setupLighting();
 
-    // Background particles
-    this._createBackgroundParticles();
-
     // Finger indicator
     this._createFingerSphere();
 
     // Resize handler
-    window.addEventListener('resize', () => this._onResize());
+    this._onResizeBound = () => this._onResize();
+    window.addEventListener('resize', this._onResizeBound);
   }
 
   _setupLighting() {
-    const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambient = new THREE.AmbientLight(0xffffff, 1.0);
     this.scene.add(ambient);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
     mainLight.position.set(5, 10, 7);
     this.scene.add(mainLight);
 
-    const fillA = new THREE.PointLight(0xff6b9d, 0.6, 25);
+    const fillA = new THREE.PointLight(0xff6b9d, 0.5, 20);
     fillA.position.set(-5, 3, 2);
     this.scene.add(fillA);
 
-    const fillB = new THREE.PointLight(0x4dc9ff, 0.6, 25);
+    const fillB = new THREE.PointLight(0x4dc9ff, 0.5, 20);
     fillB.position.set(5, -2, 3);
     this.scene.add(fillB);
-
-    const fillC = new THREE.PointLight(0x51e898, 0.4, 25);
-    fillC.position.set(0, 5, -2);
-    this.scene.add(fillC);
-  }
-
-  _createBackgroundParticles() {
-    const count = 250;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-
-    const palette = [
-      new THREE.Color('#ff6b9d'),
-      new THREE.Color('#c44dff'),
-      new THREE.Color('#4dc9ff'),
-      new THREE.Color('#51e898'),
-      new THREE.Color('#ffd84d'),
-      new THREE.Color('#ff884d')
-    ];
-
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      positions[i3] = (Math.random() - 0.5) * 35;
-      positions[i3 + 1] = (Math.random() - 0.5) * 25;
-      positions[i3 + 2] = (Math.random() - 0.5) * 25 - 5;
-
-      const color = palette[Math.floor(Math.random() * palette.length)];
-      colors[i3] = color.r;
-      colors[i3 + 1] = color.g;
-      colors[i3 + 2] = color.b;
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const material = new THREE.PointsMaterial({
-      size: 0.12,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    this.bgParticles = new THREE.Points(geometry, material);
-    this.scene.add(this.bgParticles);
   }
 
   _createFingerSphere() {
-    const geo = new THREE.SphereGeometry(0.2, 16, 16);
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xffd84d,
-      emissive: 0xffd84d,
-      emissiveIntensity: 0.5,
+    const geo = new THREE.SphereGeometry(0.15, 12, 12);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x00ff88,
       transparent: true,
-      opacity: 0.7
+      opacity: 0.85
     });
     this.fingerSphere = new THREE.Mesh(geo, mat);
     this.fingerSphere.visible = false;
     this.scene.add(this.fingerSphere);
 
     // Glow ring around finger
-    const ringGeo = new THREE.RingGeometry(0.25, 0.35, 32);
+    const ringGeo = new THREE.RingGeometry(0.2, 0.28, 24);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x4dc9ff,
+      color: 0x00ff88,
       transparent: true,
       opacity: 0.4,
       side: THREE.DoubleSide,
@@ -161,9 +110,6 @@ export class SceneEngine {
   // COLOR HELPERS
   // ============================================
 
-  /**
-   * Convert any CSS color to an {r,g,b} object (0-255)
-   */
   _parseColor(color) {
     const c = new THREE.Color(color);
     return {
@@ -173,30 +119,41 @@ export class SceneEngine {
     };
   }
 
-  _lightenColor(color, amount) {
-    const c = this._parseColor(color);
-    const r = Math.min(255, c.r + amount);
-    const g = Math.min(255, c.g + amount);
-    const b = Math.min(255, c.b + amount);
-    return `rgb(${r},${g},${b})`;
-  }
-
   _colorToRGBA(color, alpha) {
     const c = this._parseColor(color);
     return `rgba(${c.r},${c.g},${c.b},${alpha})`;
   }
 
   // ============================================
-  // OBJECT CREATION
+  // RANDOM POSITION GENERATION
   // ============================================
 
   /**
-   * Create the main text/letter sprite from a canvas
+   * Generate a random position across the visible screen area.
+   * Uses camera FOV to calculate world-space bounds at z = -4.
    */
+  _getRandomPosition() {
+    const depth = 4;
+    const fov = this.camera.fov * Math.PI / 180;
+    const aspect = this.camera.aspect;
+    const halfH = Math.tan(fov / 2) * depth;
+    const halfW = halfH * aspect;
+
+    // Keep objects within 75% of screen edges so they stay visible
+    const margin = 0.75;
+    const x = (Math.random() * 2 - 1) * halfW * margin;
+    const y = (Math.random() * 2 - 1) * halfH * margin;
+
+    return { x, y, z: -depth };
+  }
+
+  // ============================================
+  // OBJECT CREATION — Smaller balloon-style objects
+  // ============================================
+
   _createTextSprite(text, color, scale) {
-    // Use high-DPI canvas for crisp rendering
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const size = 512;
+    const size = 256; // smaller canvas for performance
     const canvas = document.createElement('canvas');
     canvas.width = size * dpr;
     canvas.height = size * dpr;
@@ -204,50 +161,39 @@ export class SceneEngine {
     ctx.scale(dpr, dpr);
     const half = size / 2;
 
-    // Fully transparent canvas
     ctx.clearRect(0, 0, size, size);
 
-    // Colored glow behind text (subtle, tight)
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 50;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Draw circle to create glow
+    // Semi-transparent balloon background circle
     ctx.beginPath();
-    ctx.arc(half, half, 70, 0, Math.PI * 2);
-    ctx.fillStyle = this._colorToRGBA(color, 0.25);
+    ctx.arc(half, half, half * 0.7, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(half, half * 0.8, 0, half, half, half * 0.7);
+    grad.addColorStop(0, this._colorToRGBA(color, 0.7));
+    grad.addColorStop(1, this._colorToRGBA(color, 0.3));
+    ctx.fillStyle = grad;
     ctx.fill();
 
-    // Reset shadow for text
-    ctx.shadowColor = 'rgba(0,0,0,0.7)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 4;
+    // Subtle shine on top-left
+    ctx.beginPath();
+    ctx.arc(half * 0.7, half * 0.6, half * 0.25, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fill();
 
-    // Main text - big bold white
-    const fontSize = text.length > 2 ? 120 : text.length > 1 ? 160 : 240;
+    // Main text
+    const fontSize = text.length > 2 ? 60 : text.length > 1 ? 80 : 110;
     ctx.font = `900 ${fontSize}px "Fredoka", "Arial Rounded MT Bold", Arial, sans-serif`;
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
     ctx.fillText(text, half, half);
-
-    // Colored outline
-    ctx.shadowColor = 'transparent';
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.4;
-    ctx.strokeText(text, half, half);
-    ctx.globalAlpha = 1.0;
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.premultiplyAlpha = false;
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
-    texture.needsUpdate = true;
 
     const spriteMat = new THREE.SpriteMaterial({
       map: texture,
@@ -259,17 +205,13 @@ export class SceneEngine {
     });
 
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(4 * scale, 4 * scale, 1);
+    sprite.scale.set(2.5 * scale, 2.5 * scale, 1);
     return sprite;
   }
 
-  /**
-   * Create an emoji sprite from a canvas
-   */
   _createEmojiSprite(emoji, label, color, scale) {
-    // Use high-DPI canvas for crisp rendering
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const size = 512;
+    const size = 256;
     const canvas = document.createElement('canvas');
     canvas.width = size * dpr;
     canvas.height = size * dpr;
@@ -277,28 +219,26 @@ export class SceneEngine {
     ctx.scale(dpr, dpr);
     const half = size / 2;
 
-    // Fully transparent canvas
     ctx.clearRect(0, 0, size, size);
 
-    // Colored glow behind emoji
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 40;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Subtle glow circle
+    // Semi-transparent balloon background
     ctx.beginPath();
-    ctx.arc(half, half, 60, 0, Math.PI * 2);
-    ctx.fillStyle = this._colorToRGBA(color, 0.2);
+    ctx.arc(half, half, half * 0.7, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(half, half * 0.8, 0, half, half, half * 0.7);
+    grad.addColorStop(0, this._colorToRGBA(color, 0.7));
+    grad.addColorStop(1, this._colorToRGBA(color, 0.3));
+    ctx.fillStyle = grad;
     ctx.fill();
 
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
+    // Shine
+    ctx.beginPath();
+    ctx.arc(half * 0.7, half * 0.6, half * 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fill();
 
-    // Emoji — draw large to fill center
-    const emojiY = label ? half - 25 : half;
-    const emojiSize = label ? 180 : 220;
+    // Emoji
+    const emojiY = label ? half - 15 : half;
+    const emojiSize = label ? 80 : 100;
     ctx.font = `${emojiSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -307,30 +247,20 @@ export class SceneEngine {
     // Label text below emoji
     if (label) {
       ctx.shadowColor = 'rgba(0,0,0,0.7)';
-      ctx.shadowBlur = 6;
-      ctx.shadowOffsetY = 3;
-      ctx.font = `700 52px "Fredoka", "Arial Rounded MT Bold", Arial, sans-serif`;
+      ctx.shadowBlur = 3;
+      ctx.shadowOffsetY = 1;
+      ctx.font = `700 28px "Fredoka", "Arial Rounded MT Bold", Arial, sans-serif`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, half, half + 110);
-
-      // Colored text outline
-      ctx.shadowColor = 'transparent';
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = color;
-      ctx.globalAlpha = 0.3;
-      ctx.strokeText(label, half, half + 110);
-      ctx.globalAlpha = 1.0;
+      ctx.fillText(label, half, half + 50);
     }
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.premultiplyAlpha = false;
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
-    texture.needsUpdate = true;
 
     const spriteMat = new THREE.SpriteMaterial({
       map: texture,
@@ -342,51 +272,29 @@ export class SceneEngine {
     });
 
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(4 * scale, 4 * scale, 1);
+    sprite.scale.set(2.5 * scale, 2.5 * scale, 1);
     return sprite;
   }
 
   /**
    * Create a 3D learning object for a letter/number
+   * Spawns at a RANDOM position on screen
    */
-  createTextObject(text, color, scale = 1.2) {
+  createTextObject(text, color, scale = 0.65) {
     this.clearActiveObject();
 
     const group = new THREE.Group();
 
-    // Background 3D shape (icosahedron wireframe behind the sprite)
-    const bgGeo = new THREE.IcosahedronGeometry(1.6 * scale, 1);
-    const bgMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(color),
-      emissive: new THREE.Color(color),
-      emissiveIntensity: 0.4,
-      transparent: true,
-      opacity: 0.3,
-      roughness: 0.4,
-      metalness: 0.3,
-      wireframe: true,
-      depthTest: true
-    });
-    const bgMesh = new THREE.Mesh(bgGeo, bgMat);
-    bgMesh.renderOrder = 0;
-    group.add(bgMesh);
-
-    // Main text sprite (always faces camera, transparent background)
+    // Main text sprite (balloon style — no wireframe icosahedron)
     const textSprite = this._createTextSprite(text, color, scale);
     textSprite.renderOrder = 2;
     group.add(textSprite);
 
-    // Orbiting decorative spheres
-    this._addOrbitingSpheres(group, color, scale, 4);
+    // Spawn at random position
+    const pos = this._getRandomPosition();
+    group.position.set(pos.x, pos.y, pos.z);
 
-    // Position in view
-    group.position.set(
-      (Math.random() - 0.5) * 3,
-      (Math.random() - 0.5) * 2,
-      -4
-    );
-
-    group.userData = { type: 'learning-object', hitRadius: 2.0 * scale };
+    group.userData = { type: 'learning-object', hitRadius: 1.0 * scale };
     this.scene.add(group);
     this.activeObject = group;
     this._addFloatAnimation(group);
@@ -395,81 +303,38 @@ export class SceneEngine {
 
   /**
    * Create an emoji-based 3D learning object
+   * Spawns at a RANDOM position on screen
    */
-  createEmojiObject(emoji, label, color, scale = 1.2) {
+  createEmojiObject(emoji, label, color, scale = 0.65) {
     this.clearActiveObject();
 
     const group = new THREE.Group();
 
-    // Background 3D shape
-    const bgGeo = new THREE.IcosahedronGeometry(1.6 * scale, 1);
-    const bgMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(color),
-      emissive: new THREE.Color(color),
-      emissiveIntensity: 0.4,
-      transparent: true,
-      opacity: 0.25,
-      roughness: 0.4,
-      metalness: 0.3,
-      wireframe: true,
-      depthTest: true
-    });
-    const bgMesh = new THREE.Mesh(bgGeo, bgMat);
-    bgMesh.renderOrder = 0;
-    group.add(bgMesh);
-
-    // Main emoji sprite
+    // Main emoji sprite (balloon style)
     const emojiSprite = this._createEmojiSprite(emoji, label, color, scale);
     emojiSprite.renderOrder = 2;
     group.add(emojiSprite);
 
-    // Orbiting decorative spheres
-    this._addOrbitingSpheres(group, color, scale, 3);
+    // Spawn at random position
+    const pos = this._getRandomPosition();
+    group.position.set(pos.x, pos.y, pos.z);
 
-    group.position.set(
-      (Math.random() - 0.5) * 3,
-      (Math.random() - 0.5) * 2,
-      -4
-    );
-
-    group.userData = { type: 'learning-object', hitRadius: 2.0 * scale };
+    group.userData = { type: 'learning-object', hitRadius: 1.0 * scale };
     this.scene.add(group);
     this.activeObject = group;
     this._addFloatAnimation(group);
     return group;
   }
 
-  _addOrbitingSpheres(group, color, scale, count) {
-    for (let i = 0; i < count; i++) {
-      const angle = (i / count) * Math.PI * 2;
-      const orbGeo = new THREE.SphereGeometry(0.1 * scale, 12, 12);
-      const orbMat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(color),
-        emissive: new THREE.Color(color),
-        emissiveIntensity: 0.4,
-        transparent: true,
-        opacity: 0.9
-      });
-      const orb = new THREE.Mesh(orbGeo, orbMat);
-      orb.position.set(
-        Math.cos(angle) * 1.8 * scale,
-        Math.sin(angle) * 1.8 * scale,
-        0
-      );
-      orb.userData._orbitAngleOffset = angle;
-      group.add(orb);
-    }
-  }
-
   // ============================================
   // EFFECTS
   // ============================================
 
-  burstParticles(position, color, count = 40) {
+  burstParticles(position, color, count = 20) {
     const colorObj = new THREE.Color(color);
 
     for (let i = 0; i < count; i++) {
-      const geo = new THREE.SphereGeometry(0.06 + Math.random() * 0.08, 8, 8);
+      const geo = new THREE.SphereGeometry(0.04 + Math.random() * 0.06, 6, 6);
       const mat = new THREE.MeshBasicMaterial({
         color: colorObj,
         transparent: true,
@@ -480,12 +345,12 @@ export class SceneEngine {
       particle.position.copy(position);
 
       particle.userData.velocity = new THREE.Vector3(
-        (Math.random() - 0.5) * 0.35,
-        (Math.random() - 0.5) * 0.35,
-        (Math.random() - 0.5) * 0.35
+        (Math.random() - 0.5) * 0.3,
+        (Math.random() - 0.5) * 0.3,
+        (Math.random() - 0.5) * 0.3
       );
       particle.userData.life = 1.0;
-      particle.userData.decay = 0.012 + Math.random() * 0.02;
+      particle.userData.decay = 0.02 + Math.random() * 0.03;
 
       this.scene.add(particle);
       this.particles.push(particle);
@@ -493,26 +358,19 @@ export class SceneEngine {
   }
 
   starBurst(position) {
-    const colors = ['#ffd84d', '#ff6b9d', '#51e898', '#4dc9ff', '#c44dff', '#ff884d'];
+    const colors = ['#ffd84d', '#ff6b9d', '#51e898', '#4dc9ff'];
     colors.forEach(c => {
-      this.burstParticles(position, c, 12);
+      this.burstParticles(position, c, 8);
     });
   }
 
   highlightObject(highlight) {
     if (!this.activeObject) return;
 
-    const target = highlight ? 1.2 : 1.0;
+    const target = highlight ? 1.15 : 1.0;
     const current = this.activeObject.scale.x;
-    const newScale = current + (target - current) * 0.12;
+    const newScale = current + (target - current) * 0.15;
     this.activeObject.scale.setScalar(newScale);
-
-    // Increase glow on bg wireframe mesh (first child)
-    const children = this.activeObject.children;
-    if (children[0] && children[0].material) {
-      children[0].material.emissiveIntensity = highlight ? 0.7 : 0.4;
-      children[0].material.opacity = highlight ? 0.5 : 0.3;
-    }
   }
 
   explodeObject(callback) {
@@ -530,7 +388,7 @@ export class SceneEngine {
     // Shrink and remove
     let scale = obj.scale.x;
     const shrink = () => {
-      scale -= 0.06;
+      scale -= 0.08;
       if (scale <= 0) {
         this.scene.remove(obj);
         this._removeFloatAnimation(obj);
@@ -559,32 +417,12 @@ export class SceneEngine {
   _addFloatAnimation(obj) {
     const startY = obj.position.y;
     const speed = 0.5 + Math.random() * 0.4;
-    const amplitude = 0.25 + Math.random() * 0.2;
-    const rotSpeed = 0.3 + Math.random() * 0.3;
+    const amplitude = 0.15 + Math.random() * 0.1;
     const phase = Math.random() * Math.PI * 2;
 
     const cb = (time) => {
       // Gentle floating motion
       obj.position.y = startY + Math.sin(time * speed + phase) * amplitude;
-
-      // Rotate the wireframe icosahedron (first child)
-      const bgMesh = obj.children[0];
-      if (bgMesh && bgMesh.isMesh) {
-        bgMesh.rotation.y += rotSpeed * 0.016;
-        bgMesh.rotation.x += rotSpeed * 0.008;
-        bgMesh.rotation.z = Math.sin(time * 0.4 + phase) * 0.15;
-      }
-
-      // Orbit the small spheres
-      obj.children.forEach(child => {
-        if (child.userData._orbitAngleOffset !== undefined) {
-          const angle = child.userData._orbitAngleOffset + time * 0.7;
-          const r = 1.8 * (obj.userData.hitRadius ? obj.userData.hitRadius / 2 : 1);
-          child.position.x = Math.cos(angle) * r;
-          child.position.y = Math.sin(angle) * r;
-          child.position.z = Math.sin(angle * 0.5) * 0.4;
-        }
-      });
     };
 
     obj.userData._floatCb = cb;
@@ -611,7 +449,7 @@ export class SceneEngine {
     this.fingerSphere.position.set(pos3D.x, pos3D.y, pos3D.z);
 
     if (this._fingerRing) {
-      this._fingerRing.rotation.z += 0.03;
+      this._fingerRing.rotation.z += 0.04;
     }
   }
 
@@ -619,7 +457,7 @@ export class SceneEngine {
     if (!this.activeObject || !fingerPos3D) return false;
 
     const objPos = this.activeObject.position;
-    const hitRadius = this.activeObject.userData.hitRadius || 1.5;
+    const hitRadius = this.activeObject.userData.hitRadius || 0.8;
 
     const dx = fingerPos3D.x - objPos.x;
     const dy = fingerPos3D.y - objPos.y;
@@ -642,21 +480,15 @@ export class SceneEngine {
     const time = this.clock.getElapsedTime();
 
     // Run animation callbacks
-    for (const cb of this._animCallbacks) {
-      cb(time);
-    }
-
-    // Animate background particles
-    if (this.bgParticles) {
-      this.bgParticles.rotation.y = time * 0.02;
-      this.bgParticles.rotation.x = Math.sin(time * 0.01) * 0.1;
+    for (let i = 0; i < this._animCallbacks.length; i++) {
+      this._animCallbacks[i](time);
     }
 
     // Update particles (explosions)
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.position.add(p.userData.velocity);
-      p.userData.velocity.y -= 0.002;
+      p.userData.velocity.y -= 0.003;
       p.userData.life -= p.userData.decay;
       p.material.opacity = Math.max(0, p.userData.life);
       p.scale.setScalar(p.userData.life);
@@ -675,14 +507,7 @@ export class SceneEngine {
 
   setTheme(theme) {
     this._theme = theme;
-    const themes = {
-      rainbow: { bg: 0x0a0a2e },
-      space: { bg: 0x05051a },
-      ocean: { bg: 0x021b36 },
-      forest: { bg: 0x0a1f0a }
-    };
-    const t = themes[theme] || themes.rainbow;
-    this.scene.background = new THREE.Color(t.bg);
+    // No background color in AR mode — camera feed is the background
   }
 
   _onResize() {

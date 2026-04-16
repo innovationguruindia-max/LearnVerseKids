@@ -1,7 +1,9 @@
 /* ============================================
    LearnVerseKids — Hand Tracking Engine
    MediaPipe Hands integration for real-time
-   gesture detection and finger tracking
+   gesture detection and finger tracking.
+   Optimised for performance with throttled
+   processing and lighter model.
    ============================================ */
 
 export class HandTracker {
@@ -18,10 +20,10 @@ export class HandTracker {
     this.handDetected = false;
     this.isPinching = false;
 
-    // Smoothing
+    // Smoothing — faster response
     this._smoothFinger = { x: 0.5, y: 0.5 };
     this._smoothCenter = { x: 0.5, y: 0.5 };
-    this._smoothFactor = 0.35;
+    this._smoothFactor = 0.5; // higher = more responsive
   }
 
   async init(videoElement) {
@@ -30,7 +32,6 @@ export class HandTracker {
     try {
       if (!window.Hands) {
         console.warn('MediaPipe Hands not loaded yet, waiting...');
-        // Wait up to 5 seconds for MediaPipe to load
         await new Promise((resolve, reject) => {
           let waited = 0;
           const check = setInterval(() => {
@@ -49,9 +50,9 @@ export class HandTracker {
 
       this.hands.setOptions({
         maxNumHands: 1,
-        modelComplexity: 0,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.5
+        modelComplexity: 0, // lightest model for speed
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.4
       });
 
       this.hands.onResults((results) => this._processResults(results));
@@ -109,8 +110,6 @@ export class HandTracker {
       const indexTip = landmarks[8];
       // Thumb tip (landmark 4)
       const thumbTip = landmarks[4];
-      // Wrist (landmark 0)
-      const wrist = landmarks[0];
       // Middle finger base (landmark 9) -> hand center approx
       const palmCenter = landmarks[9];
 
@@ -132,7 +131,7 @@ export class HandTracker {
         y: this._smoothCenter.y
       };
 
-      // Pinch detection (thumb tip to index tip distance)
+      // Pinch detection
       const dx = thumbTip.x - indexTip.x;
       const dy = thumbTip.y - indexTip.y;
       const pinchDist = Math.sqrt(dx * dx + dy * dy);
@@ -157,8 +156,7 @@ export class HandTracker {
 
   /**
    * Convert normalized hand coordinates to 3D world position
-   * x, y are 0-1 normalized from MediaPipe
-   * Returns {x, y, z} in Three.js world space
+   * Uses depth = 4 to match the spawn depth of objects
    */
   fingerTo3D(width, height, camera3D) {
     if (!this.fingerTip) return null;
@@ -171,10 +169,9 @@ export class HandTracker {
     const ndcX = (nx * 2) - 1;
     const ndcY = -(ny * 2) + 1;
 
-    // Create a point in front of the camera
-    const depth = 5; // units in front of camera
+    // Match spawn depth
+    const depth = 4;
 
-    // Use perspective to calculate world position
     const fov = camera3D.fov * Math.PI / 180;
     const aspect = camera3D.aspect;
     const halfH = Math.tan(fov / 2) * depth;

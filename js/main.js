@@ -1,6 +1,8 @@
 /* ============================================
-   LearnVerseKids — Main Application
-   System Integrator: connects all engines
+   LearnVerseKids — Main Application (AR Mode)
+   System Integrator: connects all engines.
+   Finger must physically reach the balloon
+   before it pops. Optimised for responsiveness.
    ============================================ */
 
 import { MODULES, THEMES } from './config.js';
@@ -31,6 +33,13 @@ class LearnVerseApp {
     // Parent control long-press
     this._parentPressTimer = null;
     this._parentPressStart = 0;
+
+    // Animation frame ID for cancellation
+    this._rafId = null;
+
+    // Throttle hand tracking processing
+    this._lastHandProcess = 0;
+    this._handProcessInterval = 33; // ~30fps for hand processing
   }
 
   // ============================================
@@ -46,7 +55,7 @@ class LearnVerseApp {
     this.audioEngine = new AudioEngine();
 
     // Step 2: Initialize 3D scene
-    this._updateLoading(30, 'Building 3D world...');
+    this._updateLoading(30, 'Building AR world...');
     this.sceneEngine = new SceneEngine(this.dom.canvas);
     this.sceneEngine.init();
     this.sceneEngine.setTheme(this.currentTheme);
@@ -221,7 +230,6 @@ class LearnVerseApp {
   }
 
   _setupMouseFallback() {
-    // Track mouse/touch position for interaction
     this._mousePos = null;
 
     const updateMouse = (x, y) => {
@@ -231,29 +239,15 @@ class LearnVerseApp {
       this.dom.fingerCursor.style.left = x + 'px';
       this.dom.fingerCursor.style.top = y + 'px';
 
-      // If in game, simulate hand tracking
+      // If in game, simulate hand tracking — finger must reach the balloon
       if (this.isRunning) {
-        const nx = x / window.innerWidth;
-        const ny = y / window.innerHeight;
-
-        const fov = this.sceneEngine.camera.fov * Math.PI / 180;
-        const aspect = this.sceneEngine.camera.aspect;
-        const depth = 5;
-        const halfH = Math.tan(fov / 2) * depth;
-        const halfW = halfH * aspect;
-
-        const pos3D = {
-          x: ((nx * 2) - 1) * halfW,
-          y: (-(ny * 2) + 1) * halfH,
-          z: -depth
-        };
-
+        const pos3D = this._screenTo3D(x, y);
         this.sceneEngine.updateFingerPosition(pos3D);
 
         // Check proximity for highlight
         const dist = this.sceneEngine.distanceToObject(pos3D);
-        const hitRadius = this.sceneEngine.activeObject?.userData.hitRadius || 1.5;
-        this.sceneEngine.highlightObject(dist < hitRadius * 1.5);
+        const hitRadius = this.sceneEngine.activeObject?.userData.hitRadius || 0.8;
+        this.sceneEngine.highlightObject(dist < hitRadius * 1.8);
       }
     };
 
@@ -261,20 +255,9 @@ class LearnVerseApp {
     document.addEventListener('mousemove', (e) => updateMouse(e.clientX, e.clientY));
     document.addEventListener('click', (e) => {
       if (!this.isRunning) return;
-      // On click, check collision at current mouse position (always works)
       if (this._mousePos) {
-        const nx = this._mousePos.x / window.innerWidth;
-        const ny = this._mousePos.y / window.innerHeight;
-        const fov = this.sceneEngine.camera.fov * Math.PI / 180;
-        const aspect = this.sceneEngine.camera.aspect;
-        const depth = 5;
-        const halfH = Math.tan(fov / 2) * depth;
-        const halfW = halfH * aspect;
-        const pos3D = {
-          x: ((nx * 2) - 1) * halfW,
-          y: (-(ny * 2) + 1) * halfH,
-          z: -depth
-        };
+        const pos3D = this._screenTo3D(this._mousePos.x, this._mousePos.y);
+        // Finger/mouse must actually be touching the balloon to pop it
         if (this.sceneEngine.checkCollision(pos3D)) {
           this.gameEngine.handleHit();
         }
@@ -291,6 +274,26 @@ class LearnVerseApp {
       const t = e.touches[0];
       updateMouse(t.clientX, t.clientY);
     }, { passive: true });
+  }
+
+  /**
+   * Convert screen coordinates to 3D world position
+   */
+  _screenTo3D(x, y) {
+    const nx = x / window.innerWidth;
+    const ny = y / window.innerHeight;
+
+    const fov = this.sceneEngine.camera.fov * Math.PI / 180;
+    const aspect = this.sceneEngine.camera.aspect;
+    const depth = 4; // match spawn depth
+    const halfH = Math.tan(fov / 2) * depth;
+    const halfW = halfH * aspect;
+
+    return {
+      x: ((nx * 2) - 1) * halfW,
+      y: (-(ny * 2) + 1) * halfH,
+      z: -depth
+    };
   }
 
   // ============================================
@@ -313,6 +316,10 @@ class LearnVerseApp {
 
   _backToMenu() {
     this.isRunning = false;
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
     this.gameEngine.stop();
     this.audioEngine.stopBackgroundMusic();
     this.sceneEngine.clearActiveObject();
@@ -326,10 +333,9 @@ class LearnVerseApp {
   _connectGameCallbacks() {
     this.gameEngine.onStarChange = (stars) => {
       this.dom.starCount.textContent = stars;
-      // Pop animation
       const el = this.dom.starCount.parentElement;
       el.classList.remove('hud-star-pop');
-      void el.offsetWidth; // trigger reflow
+      void el.offsetWidth;
       el.classList.add('hud-star-pop');
     };
 
@@ -389,6 +395,11 @@ class LearnVerseApp {
   // ============================================
 
   _onHandData(data) {
+    // Throttle processing for performance
+    const now = performance.now();
+    if (now - this._lastHandProcess < this._handProcessInterval) return;
+    this._lastHandProcess = now;
+
     // Update hand indicator
     if (data.handDetected) {
       this.dom.handStatus.textContent = 'Hand detected!';
@@ -415,6 +426,7 @@ class LearnVerseApp {
     }
 
     // 3D finger position & collision check
+    // IMPORTANT: Finger must PHYSICALLY REACH the balloon - no instant pop
     if (this.isRunning && data.handDetected && data.fingerTip) {
       const pos3D = this.handTracker.fingerTo3D(
         window.innerWidth,
@@ -424,17 +436,17 @@ class LearnVerseApp {
 
       this.sceneEngine.updateFingerPosition(pos3D);
 
-      // Check proximity for highlight
+      // Check proximity for visual highlight
       const dist = this.sceneEngine.distanceToObject(pos3D);
-      const hitRadius = this.sceneEngine.activeObject?.userData.hitRadius || 1.5;
+      const hitRadius = this.sceneEngine.activeObject?.userData.hitRadius || 0.8;
 
-      if (dist < hitRadius * 1.5) {
+      if (dist < hitRadius * 1.8) {
         this.sceneEngine.highlightObject(true);
       } else {
         this.sceneEngine.highlightObject(false);
       }
 
-      // Check collision
+      // ONLY pop when finger is actually touching the balloon
       if (this.sceneEngine.checkCollision(pos3D)) {
         this.gameEngine.handleHit();
       }
@@ -451,7 +463,7 @@ class LearnVerseApp {
     if (!this.isRunning) return;
 
     this.sceneEngine.update();
-    requestAnimationFrame(() => this._animate());
+    this._rafId = requestAnimationFrame(() => this._animate());
   }
 
   // ============================================
@@ -463,12 +475,10 @@ class LearnVerseApp {
     document.body.setAttribute('data-theme', themeId);
     this.sceneEngine.setTheme(themeId);
 
-    // Update theme buttons
     document.querySelectorAll('.theme-btn').forEach((btn, i) => {
       btn.classList.toggle('active', THEMES[i]?.id === themeId);
     });
 
-    // Update select
     this.dom.themeSelect.value = themeId;
   }
 
@@ -480,7 +490,7 @@ class LearnVerseApp {
     this._parentPressStart = Date.now();
     this._parentPressTimer = setTimeout(() => {
       this.dom.parentPanel.classList.remove('hidden');
-    }, 2000); // 2 second long press
+    }, 2000);
   }
 
   _parentPressUp() {
