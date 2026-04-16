@@ -23,7 +23,7 @@ export class HandTracker {
     // Smoothing — faster response
     this._smoothFinger = { x: 0.5, y: 0.5 };
     this._smoothCenter = { x: 0.5, y: 0.5 };
-    this._smoothFactor = 0.5; // higher = more responsive
+    this._smoothFactor = 0.65; // higher = more accurate, responsive tracking
   }
 
   async init(videoElement) {

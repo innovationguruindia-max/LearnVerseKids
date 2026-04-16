@@ -264,15 +264,24 @@ class LearnVerseApp {
       }
     });
 
-    // Touch events
+    // Touch events — touch directly pops balloons for kids
+    const handleTouch = (x, y) => {
+      updateMouse(x, y);
+      if (!this.isRunning) return;
+      const pos3D = this._screenTo3D(x, y);
+      if (this.sceneEngine.checkCollision(pos3D)) {
+        this.gameEngine.handleHit();
+      }
+    };
+
     document.addEventListener('touchmove', (e) => {
       const t = e.touches[0];
-      updateMouse(t.clientX, t.clientY);
+      handleTouch(t.clientX, t.clientY);
     }, { passive: true });
 
     document.addEventListener('touchstart', (e) => {
       const t = e.touches[0];
-      updateMouse(t.clientX, t.clientY);
+      handleTouch(t.clientX, t.clientY);
     }, { passive: true });
   }
 

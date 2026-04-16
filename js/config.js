@@ -321,19 +321,19 @@ export const THEMES = [
   { id: 'forest', icon: '🌲', name: 'Forest' }
 ];
 
-// Difficulty settings — reduced scales for smaller balloons
+// Difficulty settings — bigger for kids to see
 export const DIFFICULTY = {
   slow: {
-    objectScale: 0.9,
+    objectScale: 1.6,
     floatSpeed: 0.3,
-    hitRadius: 1.2,
+    hitRadius: 2.0,
     spawnDelay: 400,
     promptDuration: 4000
   },
   normal: {
-    objectScale: 0.65,
-    floatSpeed: 0.6,
-    hitRadius: 0.9,
+    objectScale: 1.3,
+    floatSpeed: 0.5,
+    hitRadius: 1.6,
     spawnDelay: 300,
     promptDuration: 2500
   }

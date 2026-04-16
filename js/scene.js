@@ -83,27 +83,16 @@ export class SceneEngine {
   }
 
   _createFingerSphere() {
-    const geo = new THREE.SphereGeometry(0.15, 12, 12);
+    // Invisible 3D collision point (no visible green sphere)
+    // Only the yellow CSS cursor is shown to the user
+    const geo = new THREE.SphereGeometry(0.1, 8, 8);
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x00ff88,
-      transparent: true,
-      opacity: 0.85
+      visible: false
     });
     this.fingerSphere = new THREE.Mesh(geo, mat);
     this.fingerSphere.visible = false;
     this.scene.add(this.fingerSphere);
-
-    // Glow ring around finger
-    const ringGeo = new THREE.RingGeometry(0.2, 0.28, 24);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x00ff88,
-      transparent: true,
-      opacity: 0.4,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending
-    });
-    this._fingerRing = new THREE.Mesh(ringGeo, ringMat);
-    this.fingerSphere.add(this._fingerRing);
+    this._fingerRing = null;
   }
 
   // ============================================
@@ -205,7 +194,7 @@ export class SceneEngine {
     });
 
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(2.5 * scale, 2.5 * scale, 1);
+    sprite.scale.set(3.5 * scale, 3.5 * scale, 1);
     return sprite;
   }
 
@@ -272,7 +261,7 @@ export class SceneEngine {
     });
 
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(2.5 * scale, 2.5 * scale, 1);
+    sprite.scale.set(3.5 * scale, 3.5 * scale, 1);
     return sprite;
   }
 
@@ -442,15 +431,10 @@ export class SceneEngine {
 
   updateFingerPosition(pos3D) {
     if (!pos3D) {
-      this.fingerSphere.visible = false;
       return;
     }
-    this.fingerSphere.visible = true;
+    // Update invisible collision point position
     this.fingerSphere.position.set(pos3D.x, pos3D.y, pos3D.z);
-
-    if (this._fingerRing) {
-      this._fingerRing.rotation.z += 0.04;
-    }
   }
 
   checkCollision(fingerPos3D) {
